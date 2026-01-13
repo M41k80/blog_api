@@ -4,7 +4,7 @@ API RESTful para gestionar un blog, construida con Python.
 Esta API incluye funcionalidades para usuarios, publicaciones, comentarios y gestión de archivos, con soporte para autenticación y roles.
 
 ## Estructura del proyecto
-
+```
 app/
 ├── api/ # Endpoints y routers de la API
 ├── core/ # Configuraciones y utilidades centrales
@@ -14,7 +14,7 @@ app/
 ├── utils/ # Funciones auxiliares
 ├── init.py
 └── main.py # Punto de entrada de la aplicación
-
+```
 
 ## Funcionalidades
 
