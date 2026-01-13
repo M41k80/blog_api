@@ -1,0 +1,146 @@
+
+import sqlite3
+from typing import Optional, List, Tuple
+from fastapi import Depends, HTTPException
+from fastapi.background import P
+from sqlalchemy import select, func, text
+from math import ceil
+from sqlalchemy.orm import Session, selectinload, joinedload
+from app.models import PostORM, TagORM
+from app.models.user import User
+from app.core.security import get_current_user
+from app.utils.slugify_utils import ensure_unique_slug, slugify_base
+
+
+
+class PostRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get(self, post_id: int) -> Optional[PostORM]:
+        post_find = select(PostORM).where(PostORM.id == post_id)
+        return self.db.execute(post_find).scalar_one_or_none()
+    
+    
+    def get_by_slug(self, slug: str) -> Optional[PostORM]:
+        query = (
+            select(PostORM).where(PostORM.slug == slug)
+        )
+        return self.db.execute(query).scalar_one_or_none()
+
+    def search(
+        self,
+        query: Optional[str],
+        order_by: str,
+        direction: str,
+        page: int,
+        per_page: int,
+    ) -> Tuple[int, List[PostORM]]:
+
+        results = select(PostORM)
+
+        query = query or None
+
+        if query:
+            results = results.where(PostORM.title.ilike(f"%{query}%"))
+        # for post in BLOG_POSTS:
+        #     if query.lower() in post["title"].lower():
+        #         results.append(post)
+        total = self.db.scalar(select(func.count()).select_from(results.subquery())) or 0
+        if total == 0:
+            return 0, []
+        
+
+        current_page = min(page, max(1, ceil(total / per_page)))
+        order_col = PostORM.id if order_by == "id" else func.lower(PostORM.title)
+        
+
+        results = results.order_by(
+            order_col.asc() if direction == "asc" else order_col.desc()
+        )
+
+       
+    
+        start = (current_page - 1) * per_page
+        items = self.db.execute(results.limit(per_page).offset(start)).scalars().all()
+        
+        return total, items
+
+    def by_tags(self, tags_names: List[str]) -> List[PostORM]:
+        normalized_tag_names = [tag.strip().lower() for tag in tags_names if tag.strip()]
+        if not normalized_tag_names:
+            return []
+    
+        post_list = (
+            select(PostORM).options(
+                selectinload(PostORM.tags), # se carga la lista de tags
+                joinedload(PostORM.user), # se carga el autor
+            ).where(PostORM.tags.any(func.lower(TagORM.name).in_(normalized_tag_names))) # dentro de la lista de tags se busca cualquier que coincida con el nombre de la etiqueta
+            .order_by(PostORM.id.desc()) # se ordena por id descendente
+        )
+        
+        return self.db.execute(post_list).scalars().all()
+    
+    def ensure_author(self, name: str, email: str) -> User:
+        
+        author_obj = self.db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        
+        return author_obj
+                
+           
+        
+    def ensure_tag(self, name: str) -> TagORM:
+        
+        normalize = name.strip().lower()
+        tag_obj = self.db.execute(select(TagORM).where(func.lower(TagORM.name) == normalize)).scalar_one_or_none() # para SQLite
+        # tag_obj = self.db.execute(select(TagORM).where(TagORM.name.ilike(name))).scalar_one_or_none() // para Postgres
+        
+        if tag_obj:
+            return tag_obj
+        
+        tag_obj = TagORM(name=name)
+        self.db.add(tag_obj)
+        self.db.flush()
+        
+        return tag_obj
+
+    def create_post(self, title: str, content:str,tags: List[dict], image_url: str, category_id: Optional[int], user: User = Depends(get_current_user)) -> PostORM:
+        author_obj = None
+        if user:
+            author_obj = self.ensure_author(user.full_name, user.email)
+            
+            
+        
+        unique_slug = ensure_unique_slug(self.db, title)
+
+            
+        post = PostORM(title=title, slug=unique_slug, content=content,image_url=image_url, user=author_obj, category_id=category_id)
+        
+        
+        names = tags[0]['name'].split(',')
+        for name in names:
+            name = name.strip().lower()
+            if not name:
+                continue
+            tag_obj = self.ensure_tag(name)
+            post.tags.append(tag_obj)
+            
+        self.db.add(post)
+        self.db.flush()
+        self.db.refresh(post)
+        return post
+    
+    def update_post(self, post: PostORM, updates: dict) -> PostORM:
+        
+        for key, value in updates.items():
+            setattr(post, key, value)
+            
+            
+        return post
+        
+    
+    
+    def delete_post(self, post: PostORM)-> None:
+       
+        self.db.delete(post) #se elimina el post
+          

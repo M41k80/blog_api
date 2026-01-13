@@ -1,0 +1,18 @@
+from pydantic import BaseModel, Field
+
+class CategoryBase(BaseModel):
+    name: str = Field(min_length=2, max_length=100, description="The name of the category (2-100 characters)")
+    slug: str = Field(min_length=2, max_length=100, description="The slug of the category (2-100 characters)")
+    
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100, description="The name of the category (2-100 characters)")
+    slug: str | None = Field(default=None, min_length=2, max_length=100, description="The slug of the category (2-100 characters)")
+    
+    
+class CategoryPublic(CategoryBase):
+    id: int
+    
+    model_config = {"from_attributes": True}

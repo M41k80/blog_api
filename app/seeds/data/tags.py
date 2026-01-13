@@ -1,0 +1,23 @@
+
+TAGS = [
+    {"name": "python"},
+    {"name": "fastapi"},
+    {"name": "sqlalchemy"},
+    {"name": "postgresql"},
+    {"name": "docker"},
+    {"name": "kubernetes"},
+    {"name": "git"},
+    {"name": "linux"},
+    {"name": "devops"},
+    {"name": "web-development"},
+    {"name": "data-science"},
+    {"name": "machine-learning"},
+    {"name": "django"},
+    {"name": "flask"},
+    {"name": "javascript"},
+    {"name": "typescript"},
+    {"name": "react"},
+    {"name": "vue-js"},
+    {"name": "angular"},
+    {"name": "apis"},
+]
